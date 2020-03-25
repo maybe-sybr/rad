@@ -139,7 +139,7 @@ function _rad_edit_commit_msg () {
     local -r COMMIT_MSG_PATH="${1}"
     # we initially populate the message with a unique change ID which can be
     # used to correlate the commits in each repo later
-    local -r CHANGE_ID="I$(date +%s.%N | shasum)"
+    local -r CHANGE_ID="I$(date +%s.%N | shasum | cut -d ' ' -f1)"
     cat >"${COMMIT_MSG_PATH}" <<EOF
 
 
