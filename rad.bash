@@ -59,9 +59,18 @@ function query_yn () {
     fi
 }
 
+function true_uniq () {
+    # this is array magic where lines are only printed if they've not been seen
+    # before - it behaves as a true `uniq` which doesn't need to sort its input
+    awk '!x[$0]++'
+}
+
 # wrap some command in a `repo forall`
 BOLD="\033[1m"
 RESET="\033[0m"
+function _repo_wrap_inner () {
+    repo forall -ec "${*}"
+}
 function _repo_wrap () {
     local -a _RAD_FORALL_INIT=(
         "source \"${_RAD_SCRIPT_PATH}\"" " ; "
@@ -76,7 +85,7 @@ function _repo_wrap () {
             "echo -e \"--> project \${REPO_PATH}/\"" " ; "
         )
     fi
-    repo forall -ec "${_RAD_FORALL_INIT} ${*}"
+    _repo_wrap_inner "${_RAD_FORALL_INIT} ${*}"
 }
 
 # find the closest .repo directory
@@ -189,3 +198,85 @@ function _rad_whatchanged_all () {
         ${PAGER:-cat}
 }
 alias rwc="_rad_whatchanged_all"
+
+# export a unified quilt patch series for commits since branching from upstream
+_RAD_QUILT_PATCHDIR=".rad/patches"
+# helper functions for extracting and combining patchfiles
+function extract_msg () {
+    # this drops the leading 'From <hash>` line which is fine because its
+    # meaningless after we combine the patches anyway
+    sed -n '/From:/,/---/p' "${1}"
+}
+function extract_diff () {
+    # lines between the first `diff ...` and the trailing triple dash line
+    sed -n '/^diff/,/^--[^-]/p' "${1}"
+}
+function combine_diffs () {
+    # recursive func which runs `combinediff` from `patchutils` over N files
+    if [ $# -eq 0 ]; then
+        echo "[E] Bad call to combine_diffs: $@" >&2
+        return 127
+    elif [ $# -eq 1 ]; then
+        extract_diff "${1}"
+    elif [ $# -eq  2 ]; then
+        combinediff -q <(extract_diff "${1}") <(extract_diff "${2}")
+    else
+        combinediff -q <(extract_diff "${1}") <(combine_diffs "${@:2}")
+    fi
+}
+# the actual logic for doing a quilt export
+function _rad_combine_patches () {
+    if [ $# -ne 2 ]; then
+        echo "[E] Bad call to _rad_combine_patches: $@"
+        return 127
+    fi
+    local -r sf="${1}"      # the series file to add the patch to
+    local -r cid="${2}"     # the change ID
+    echo "[I] Combining diffs for Change-Id: I${cid}"
+    # the combined patch will be named for change ID and we'll add it to the
+    # quilt patch series file now
+    local -r cpf_name="${cid}.patch"
+    local -r cpf_path="${sf%/*}/${cpf_name}"
+    # delete any existing combined patch so we don't get confused
+    rm -f -- "${cpf_path}"
+    local -a cid_patchfiles=($(
+        grep -lr "${cid}" "${sf%/*}"
+    ))
+    # Get the message from the first patch we found
+    extract_msg "${cid_patchfiles[1]}" > "${cpf_path}"
+    combine_diffs "${cid_patchfiles[@]}" >> "${cpf_path}"
+    # Finally, add the new patch file to the series
+    echo "${cpf_name}" >> "${sf}"
+}
+function _rad_quilt_export () {
+    # get all patches since branching from upstream in all projects
+    local -ar split_patches=($(
+        _repo_wrap_inner git format-patch @{u}..                              \
+            --output-directory="${PWD}/${_RAD_QUILT_PATCHDIR}/\${REPO_PATH}"  \
+            --src-prefix="a/\${REPO_PATH}/" --dst-prefix="b/\${REPO_PATH}/"
+    ))
+    if [ -z "${split_patches}" ]; then
+        echo "[I] No patches to export :)"
+        return 0
+    fi
+    # get the unique change IDs using `true_uniq` from the patchfile names
+    # which are currently in order per-project, resulting in a well enough
+    # ordered set of change IDs to be used to build a quilt patch series
+    #
+    # note that any changes without a Change-Id tag (ie. not committed using
+    # `_rad_commit_all` or with the tag removed from the message, will not be
+    # included!
+    local -ar uniq_change_ids=($(
+        grep -Pho '(?<=Change-Id: I)[0-9a-f]+' "${split_patches[@]}" |  \
+            true_uniq
+    ))
+    # for each change ID, combine the per-project patches into a single
+    # combined patch with the email content from the first one (they should all
+    # be the same since they were committed with `_rad_commit_all`)
+    local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/series"
+    [ -f "${sf}" ] && truncate -s 0 "${sf}" || touch "${sf}"
+    for cid in "${uniq_change_ids[@]}"; do
+        _rad_combine_patches "${sf}" "${cid}"
+    done
+}
+alias rqe="_rad_quilt_export"
