@@ -73,7 +73,8 @@ function _repo_wrap_inner () {
 }
 function _repo_wrap () {
     local -a _RAD_FORALL_INIT=(
-        "source \"${_RAD_SCRIPT_PATH}\"" " ; "
+        # sometimes this spits out a spurious syntax error...
+        "source \"${_RAD_SCRIPT_PATH}\" 2>/dev/null" " ; "
     )
     # if we're on a TTY, bold the project header line
     if [ -t 1 ]; then
