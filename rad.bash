@@ -51,7 +51,7 @@ fi
 
 # util functions
 function query_yn () {
-    read -p "$@ -- [y/n]: " -n 2 -r
+    read -p "$* -- [y/n]: " -n 2 -r
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         return 0;
     else
@@ -86,17 +86,17 @@ function _repo_wrap () {
             "echo -e \"--> project \${REPO_PATH}/\"" " ; "
         )
     fi
-    _repo_wrap_inner "${_RAD_FORALL_INIT} ${*}"
+    _repo_wrap_inner "${_RAD_FORALL_INIT[*]} ${*}"
 }
 
 # find the closest .repo directory
 function _rad_find_repo () {
     if [ $# -gt 1 ]; then
-        echo "[E] Bad call to _rad_find_repo: $@"
+        echo "[E] Bad call to _rad_find_repo: ${*}"
         return 127
     fi
     local CAND_BASE="$(realpath -e "${1:-${PWD}}")"
-    while [ ! -z "${CAND_BASE}" ]; do
+    while [ -n "${CAND_BASE}" ]; do
         local CAND="${CAND_BASE}/.repo"
         if [ -d "${CAND}" ]; then
             echo "${CAND}"
@@ -110,11 +110,11 @@ function _rad_find_repo () {
 # find the closest .git directory to a potentially non-existant path
 function _rad_find_git () {
     if [ $# -gt 1 ]; then
-        echo "[E] Bad call to _rad_find_git: $@"
+        echo "[E] Bad call to _rad_find_git: ${*}"
         return 127
     fi
     local CAND_BASE="$(realpath -m "${1:-${PWD}}")"
-    while [ ! -z "${CAND_BASE}" ]; do
+    while [ -n "${CAND_BASE}" ]; do
         local CAND="${CAND_BASE}/.git"
         if [ -d "${CAND}" ]; then
             echo "${CAND}"
@@ -161,7 +161,7 @@ function _rad_find_commit_msg_path () {
 }
 function _rad_edit_commit_msg () {
     if [ $# -ne 1 ]; then
-        echo "[E] Bad call to _rad_edit_commit_msg: $@"
+        echo "[E] Bad call to _rad_edit_commit_msg: ${*}"
         return 127
     fi
     local -r COMMIT_MSG_PATH="${1}"
@@ -176,8 +176,8 @@ Change-Id: ${CHANGE_ID}
 EOF
     # and also the output of `git status` in each repo, commented of course
     _repo_wrap "${IF_STAGED_CHANGES} && git status || echo -e 'No changes to commit\n'" |  \
-    while IFS= read line; do
-        if [ ! -z "${line}" ]; then
+    while IFS= read -r line; do
+        if [ -n "${line}" ]; then
             echo "# ${line}"
         else
             echo "#"
@@ -191,7 +191,7 @@ EOF
 function _rad_commit_all () {
     # XXX: gross, but enough to let us use `-p` if we don't get exotic with the
     # specified options
-    EXTRA_ARGS="${@}"
+    EXTRA_ARGS="${*}"
     if [[ "${EXTRA_ARGS}" =~ "-p" ]]; then
         _repo_wrap _repo_add_interactive_each -p
         EXTRA_ARGS="${EXTRA_ARGS/-p/}"
@@ -233,7 +233,7 @@ function extract_diff () {
 function combine_diffs () {
     # recursive func which runs `combinediff` from `patchutils` over N files
     if [ $# -eq 0 ]; then
-        echo "[E] Bad call to combine_diffs: $@" >&2
+        echo "[E] Bad call to combine_diffs: ${*}" >&2
         return 127
     elif [ $# -eq 1 ]; then
         extract_diff "${1}"
@@ -246,7 +246,7 @@ function combine_diffs () {
 # the actual logic for doing a quilt export
 function _rad_combine_patches () {
     if [ $# -ne 2 ]; then
-        echo "[E] Bad call to _rad_combine_patches: $@"
+        echo "[E] Bad call to _rad_combine_patches: ${*}"
         return 127
     fi
     local -r sf="${1}"      # the series file to add the patch to
@@ -270,11 +270,11 @@ function _rad_combine_patches () {
 function _rad_quilt_export () {
     # get all patches since branching from upstream in all projects
     local -ar split_patches=($(
-        _repo_wrap_inner git format-patch @{u}..                              \
+        _repo_wrap_inner git format-patch '@{u}..'                            \
             --output-directory="${PWD}/${_RAD_QUILT_PATCHDIR}/\${REPO_PATH}"  \
             --src-prefix="a/\${REPO_PATH}/" --dst-prefix="b/\${REPO_PATH}/"
     ))
-    if [ -z "${split_patches}" ]; then
+    if [ -z "${split_patches[*]}" ]; then
         echo "[I] No patches to export :)"
         return 0
     fi
@@ -313,7 +313,7 @@ function _rad_quilt_import () {
     local -r spf_dir="${sf%/*}/split"
     local -r rpf_dir="${sf%/*}/recombined"
     local -r patch_file="$(_rad_find_repo)/MBOX_PATCH"
-    while read cpf_name; do
+    while read -r cpf_name; do
         local cpf_path="${sf%/*}/${cpf_name}"
         echo "[I] Applying ${cpf_path##*/}"
         # remove any old recombined patch files
@@ -323,7 +323,7 @@ function _rad_quilt_import () {
             splitdiff -a -p 1 -D "${spf_dir}" "${cpf_path}" |   \
                 grep -Po '(?<=>).*$'
         ))
-        if [ -z "${split_patches}" ]; then
+        if [ -z "${split_patches[*]}" ]; then
             echo "[I] No patches to import :)"
             return 0
         fi
