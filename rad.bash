@@ -414,3 +414,14 @@ function _rad_quilt_import_inner () {
     git am "${mbox_patch_path}" || git am --abort
 }
 alias rqi="_rad_quilt_recombine_outer _rad_quilt_import_inner"
+# apply a unified quilt patch series without committing it and without `quilt`!
+function _rad_quilt_apply_inner () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to __rad_quilt_apply_inner: ${*}"
+        return 127
+    fi
+    # we expect to be in the repository of interest thanks to the outer loop
+    local -r mbox_patch_path="${1}"
+    git apply --stat --apply "${mbox_patch_path}"
+}
+alias rqa="_rad_quilt_recombine_outer _rad_quilt_apply_inner"
