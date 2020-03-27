@@ -147,6 +147,8 @@ alias ra="_repo_wrap _repo_add_interactive_each"
 
 # reset all staged changes
 alias rr="_repo_wrap git reset"
+# make all project trees pristine
+alias rpristine="_repo_wrap 'git reset --hard HEAD; git clean -dffx'"
 
 # shorten `repo status` and `repo diff`
 alias rst="repo status"
