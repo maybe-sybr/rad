@@ -300,6 +300,52 @@ function _rad_quilt_export () {
 }
 alias rqe="_rad_quilt_export"
 
+function _rad_perproj_recombine_patch () {
+    if [ $# -ne 2 ]; then
+        echo "[E] Bad call to _rad_perproj_recombine_patch: ${*}"
+        return 127
+    fi
+    local -r cpf_path="${1}"    # combined patch file to split and recombine
+    local -r ctx_path="${2}"    # directory to work in (context)
+    local -r spf_dir="${ctx_path}/split"
+    local -r rpf_dir="${ctx_path}/recombined"
+    # remove any old recombined patch files
+    [ -d "${rpf_dir}" ] && find "${rpf_dir}" -name "${cpf_name}" -delete
+    # split the combined patch file into per-target file patches
+    local -a split_patches=($(
+        splitdiff -a -p 1 -D "${spf_dir}" "${cpf_path}" | grep -Po '(?<=>).*$'
+    ))
+    if [ -z "${split_patches[*]}" ]; then
+        echo "[I] No patches to import :)"
+        return 0
+    fi
+    # for each of the split patches, work out to which project it applies and
+    # add the diff to the project specific recombined patch file
+    local -a all_rpf_paths=()
+    for spf_path in "${split_patches[@]}"; do
+        local tf_path="$(
+            # this pattern conveniently filters out `/dev/null` targets
+            grep -Po '(?<=[-+]{3} [ab]/).*$' "${spf_path}" | true_uniq
+        )"
+        if [[ "${tf_path}" =~ $'\n' ]]; then
+            echo "[E] Somehow we didn't manage to split up ${cpf_path##*/}"
+            echo "[E] ${spf_path##*/} has multiple file targets"
+            return 127
+        fi
+        # find the relative path to the project this patch targets
+        local trg_path="$(_rad_find_git "${tf_path}")"
+        local prj_path="$(realpath --relative-to="${PWD}" "${trg_path%/.git}")"
+        # now strip that path from the split patch file
+        local rpf_path="${rpf_dir}/${prj_path}/${cpf_name}"
+        mkdir -p "${rpf_path%/*}"
+        sed "s#${prj_path}/##" "${spf_path}" >> "${rpf_path}"
+        all_rpf_paths+=("${rpf_path}")
+    done
+    # spit out the unique recombined patch file paths
+    for rpf_path in "${all_rpf_paths[@]}"; do
+        echo "${rpf_path}"
+    done | true_uniq
+}
 # import a unified quilt patch series and commit the changes into each project
 # repository as if we had `git am`ed per-project mbox patches
 function _rad_quilt_import () {
@@ -310,50 +356,24 @@ function _rad_quilt_import () {
         echo "[E] No quilt series file found :("
         return 127
     fi
-    local -r spf_dir="${sf%/*}/split"
-    local -r rpf_dir="${sf%/*}/recombined"
+    local -r ctx_path="${sf%/*}"
     local -r patch_file="$(_rad_find_repo)/MBOX_PATCH"
     while read -r cpf_name; do
-        local cpf_path="${sf%/*}/${cpf_name}"
+        local cpf_path="${ctx_path}/${cpf_name}"
         echo "[I] Applying ${cpf_path##*/}"
-        # remove any old recombined patch files
-        [ -d "${rpf_dir}" ] && find "${rpf_dir}" -name "${cpf_name}" -delete
-        # split the combined patch file into per-target file patches
-        local -a split_patches=($(
-            splitdiff -a -p 1 -D "${spf_dir}" "${cpf_path}" |   \
-                grep -Po '(?<=>).*$'
-        ))
-        if [ -z "${split_patches[*]}" ]; then
-            echo "[I] No patches to import :)"
-            return 0
-        fi
-        # for each of the split patches, work out to which project it applies
-        # and add the diff to the project specific recombined patch file
-        for spf_path in "${split_patches[@]}"; do
-            local tf_path="$(
-                # this pattern conveniently filters out `/dev/null` targets
-                grep -Po '(?<=[-+]{3} [ab]/).*$' "${spf_path}" | true_uniq
-            )"
-            if [[ "${tf_path}" =~ $'\n' ]]; then
-                echo "[E] Somehow we didn't manage to split up ${cpf_path##*/}"
-                echo "[E] ${spf_path##*/} has multiple file targets"
-                return 127
-            fi
-            # find the relative path to the project this patch targets
-            local trg_path="$(_rad_find_git "${tf_path}")"
-            local prj_path="$(realpath --relative-to="${PWD}" "${trg_path%/.git}")"
-            # now strip that path from the split patch file
-            mkdir -p "${rpf_dir}/${prj_path}"
-            sed "s#${prj_path}/##" "${spf_path}"    \
-                >> "${rpf_dir}/${prj_path}/${cpf_name}"
-        done
-        # finally, for each recombined patch file, work out what project it
-        # applies to and `git am` it in that directory
-        for rcpf_path in $(find "${rpf_dir}" -name "${cpf_name}"); do
-            local prj_path="$(
-                realpath --relative-to="${rpf_dir}" "${rcpf_path%/*.patch}"
-            )"
+        # split and recombine this combined patch file for each project repo it
+        # touches, then apply those patches using `git am`
+        for rcpf_path in $(
+            _rad_perproj_recombine_patch "${cpf_path}" "${ctx_path}"
+        ); do
+            # strip the context path plus one more component, and the filename
+            # to determine what project this patch applies to - this is logic
+            # coupling between this function and `_rad_perproj_recombine_patch`
+            local prj_path="${${rcpf_path%/*.patch}#${ctx_path}/*/}"
             echo "${BOLD}${prj_path}${RESET}"
+            # we'd like to use substitutions in the `git am` command but for
+            # some reason it complains when they're used, so we drop the patch
+            # file we're going to apply to a well known path
             cat <(extract_msg "${cpf_path}") "${rcpf_path}" > "${patch_file}"
             git -C "${prj_path}" am "${patch_file}" ||  \
                 git -C "${prj_path}" am --abort
