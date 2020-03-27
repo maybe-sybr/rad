@@ -392,7 +392,7 @@ function _rad_quilt_recombine_outer () {
             # to determine what project this patch applies to - this is logic
             # coupling between this function and `_rad_perproj_recombine_patch`
             local prj_path="${${rcpf_path%/*.patch}#${ctx_path}/*/}"
-            echo "${BOLD}${prj_path}${RESET}"
+            echo "${BOLD}project ${prj_path}/${RESET}"
             # we'd like to use substitutions in the `git am` command but for
             # some reason it complains when they're used, so we drop the patch
             # file we're going to apply to a well known path
