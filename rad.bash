@@ -300,6 +300,8 @@ function _rad_quilt_export () {
 }
 alias rqe="_rad_quilt_export"
 
+# split a combined patch file into per-project ones for projects which exist in
+# the current work tree
 function _rad_perproj_recombine_patch () {
     if [ $# -ne 2 ]; then
         echo "[E] Bad call to _rad_perproj_recombine_patch: ${*}"
@@ -334,6 +336,10 @@ function _rad_perproj_recombine_patch () {
         fi
         # find the relative path to the project this patch targets
         local trg_path="$(_rad_find_git "${tf_path}")"
+        if [ -z "${trg_path}" ]; then
+            echo "[W] Skipping diff target '${tf_path}' not in a git repo" >&2
+            continue
+        fi
         local prj_path="$(realpath --relative-to="${PWD}" "${trg_path%/.git}")"
         # now strip that path from the split patch file
         local rpf_path="${rpf_dir}/${prj_path}/${cpf_name}"
