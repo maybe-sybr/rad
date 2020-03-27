@@ -65,6 +65,27 @@ function true_uniq () {
     awk '!x[$0]++'
 }
 
+# find a directory which is a sibling of the input path or a (grand*)-parent
+function _rad_find_auntie_dir_path () {
+    if [ $# -gt 2 ] || [ $# -eq 0 ]; then
+        echo "[E] Bad call to _rad_find_auntie_dir_path: ${*}"
+        return 127
+    fi
+    local DIR_NAME="${1}"
+    # we don't require that the initial path exist since we might be hunting
+    # for an auntie for a non-existant file which we want to write to later
+    local CAND_BASE="$(realpath -m "${2:-${PWD}}")"
+    while [ -n "${CAND_BASE}" ]; do
+        local CAND="${CAND_BASE}/${DIR_NAME}"
+        if [ -d "${CAND}" ]; then
+            echo "${CAND}"
+            return 0
+        fi
+        CAND_BASE="${CAND_BASE%/*}"
+    done
+    return 1
+}
+
 # wrap some command in a `repo forall`
 BOLD="\033[1m"
 RESET="\033[0m"
@@ -91,38 +112,11 @@ function _repo_wrap () {
 
 # find the closest .repo directory
 function _rad_find_repo () {
-    if [ $# -gt 1 ]; then
-        echo "[E] Bad call to _rad_find_repo: ${*}"
-        return 127
-    fi
-    local CAND_BASE="$(realpath -e "${1:-${PWD}}")"
-    while [ -n "${CAND_BASE}" ]; do
-        local CAND="${CAND_BASE}/.repo"
-        if [ -d "${CAND}" ]; then
-            echo "${CAND}"
-            return 0
-        fi
-        CAND_BASE="${CAND_BASE%/*}"
-    done
-    return 1
+    _rad_find_auntie_dir_path ".repo" "${@}"
 }
-
 # find the closest .git directory to a potentially non-existant path
 function _rad_find_git () {
-    if [ $# -gt 1 ]; then
-        echo "[E] Bad call to _rad_find_git: ${*}"
-        return 127
-    fi
-    local CAND_BASE="$(realpath -m "${1:-${PWD}}")"
-    while [ -n "${CAND_BASE}" ]; do
-        local CAND="${CAND_BASE}/.git"
-        if [ -d "${CAND}" ]; then
-            echo "${CAND}"
-            return 0
-        fi
-        CAND_BASE="${CAND_BASE%/*}"
-    done
-    return 1
+    _rad_find_auntie_dir_path ".git" "${@}"
 }
 
 # stage changes interactively
