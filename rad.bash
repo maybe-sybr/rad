@@ -65,6 +65,21 @@ function true_uniq () {
     awk '!x[$0]++'
 }
 
+# finc a suitable path for a file to be edited and used later
+function _rad_find_editable_file_path () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to _rad_find_editable_file_path: ${*}" >&2
+        return 127
+    fi
+    local -r FILE_NAME="${1}"
+    local -r REPO_DIR="$(_rad_find_repo)"
+    if [ ! -z "${REPO_DIR}" ]; then
+        echo "${REPO_DIR}/${FILE_NAME}"
+    else
+        echo "${PWD}/.${FILE_NAME}"
+    fi
+}
+
 # find a directory which is a sibling of the input path or a (grand*)-parent
 function _rad_find_auntie_dir_path () {
     if [ $# -gt 2 ] || [ $# -eq 0 ]; then
@@ -148,10 +163,8 @@ IF_ANY_CHANGES="git status -z | grep -qEZ '^\s?[MADRCU]'"
 IF_STAGED_CHANGES="git status -z | grep -qEZ '^[MADRCU]'"
 
 function _rad_find_commit_msg_path () {
-    local -r REPO_DIR="$(_rad_find_repo)"
-    if [ ! -z "${REPO_DIR}" ]; then
-        echo "${REPO_DIR}/COMMIT_EDITMSG"
-    fi
+    _rad_find_editable_file_path "COMMIT_MSG"
+
 }
 function _rad_edit_commit_msg () {
     if [ $# -ne 1 ]; then
@@ -348,6 +361,9 @@ function _rad_perproj_recombine_patch () {
 }
 # import a unified quilt patch series and commit the changes into each project
 # repository as if we had `git am`ed per-project mbox patches
+function _rad_find_mbox_patch_path () {
+    _rad_find_editable_file_path "MBOX_PATH"
+}
 function _rad_quilt_import () {
     # loop through each patch in the quilt series splitting them up and
     # recommitting using the message header from the original patch file
@@ -357,7 +373,7 @@ function _rad_quilt_import () {
         return 127
     fi
     local -r ctx_path="${sf%/*}"
-    local -r patch_file="$(_rad_find_repo)/MBOX_PATCH"
+    local -r patch_file="$(_rad_find_mbox_patch_path)"
     while read -r cpf_name; do
         local cpf_path="${ctx_path}/${cpf_name}"
         echo "[I] Applying ${cpf_path##*/}"
