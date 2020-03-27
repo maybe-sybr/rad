@@ -359,12 +359,18 @@ function _rad_perproj_recombine_patch () {
         echo "${rpf_path}"
     done | true_uniq
 }
-# import a unified quilt patch series and commit the changes into each project
-# repository as if we had `git am`ed per-project mbox patches
+# outer loop for splitting and recombining a unified quilt patch series, and
+# then running another inner function for whatever we want to do with each of
+# those recombined patch files
 function _rad_find_mbox_patch_path () {
     _rad_find_editable_file_path "MBOX_PATH"
 }
-function _rad_quilt_import () {
+function _rad_quilt_recombine_outer () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to _rad_quilt_recombine_outer: ${*}"
+        return 127
+    fi
+    local -r inner_func="${1}"
     # loop through each patch in the quilt series splitting them up and
     # recommitting using the message header from the original patch file
     local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/series"
@@ -391,9 +397,20 @@ function _rad_quilt_import () {
             # some reason it complains when they're used, so we drop the patch
             # file we're going to apply to a well known path
             cat <(extract_msg "${cpf_path}") "${rcpf_path}" > "${patch_file}"
-            git -C "${prj_path}" am "${patch_file}" ||  \
-                git -C "${prj_path}" am --abort
+            # run the args passed to this function
+            (cd "${prj_path}"; "${inner_func}" "${patch_file}")
         done
     done <"${sf}"
 }
-alias rqi="_rad_quilt_import"
+# import a unified quilt patch series and commit the changes into each project
+# repository as if we had `git am`ed per-project mbox patches
+function _rad_quilt_import_inner () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to _rad_quilt_import_inner: ${*}"
+        return 127
+    fi
+    # we expect to be in the repository of interest thanks to the outer loop
+    local -r mbox_patch_path="${1}"
+    git am "${mbox_patch_path}" || git am --abort
+}
+alias rqi="_rad_quilt_recombine_outer _rad_quilt_import_inner"
