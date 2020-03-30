@@ -181,6 +181,7 @@ function _rad_edit_commit_msg () {
 
 
 Change-Id: ${CHANGE_ID}
+# Depends: I...
 
 EOF
     # and also the output of `git status` in each repo, commented of course
@@ -295,8 +296,14 @@ function _rad_quilt_export () {
     # `_rad_commit_all` or with the tag removed from the message, will not be
     # included!
     local -ar uniq_change_ids=($(
-        grep -Pho '(?<=Change-Id: I)[0-9a-f]+' "${split_patches[@]}" |  \
-            true_uniq
+        for split_patch in "${split_patches[@]}"; do
+            # make sure we list dependent changes first
+            grep -Pho '(?<=Depends: I)[0-9a-f]+' "${split_patch}"
+            # then the actual change in this patch
+            grep -Pho '(?<=Change-Id: I)[0-9a-f]+' "${split_patch}"
+        done | true_uniq |  \
+        grep -xf <(grep -Pho '(?<=Change-Id: I)[0-9a-f]+' "${split_patches[@]}") -
+        # select only lines we actually have changes for ^
     ))
     # for each change ID, combine the per-project patches into a single
     # combined patch with the email content from the first one (they should all
