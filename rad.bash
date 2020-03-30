@@ -441,3 +441,55 @@ function _rad_quilt_apply_inner () {
     git apply --stat --apply "${mbox_patch_path}"
 }
 alias rqa="_rad_quilt_recombine_outer _rad_quilt_apply_inner"
+
+# list the quilt patch series available for import
+function _rad_quilt_list_one () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to _rad_quilt_list_one: ${*}"
+        return 127
+    fi
+    while read line; do
+        cpf_path="${sf%/*}/${line}"
+        echo -e "\t${line%.patch} -> $(grep 'Subject:' "${cpf_path}")"
+    done <"${1}"
+}
+function _rad_quilt_list () {
+    echo "[I] ${BOLD}Patchset series available:${RESET}"
+    for sf in "${PWD}/${_RAD_QUILT_PATCHDIR}/"*series; do
+        echo "${sf##*/}"
+        _rad_quilt_list_one "${sf}"
+    done
+}
+alias rql="_rad_quilt_list"
+
+# combine named patcheset series into a single file for quilt
+function _rad_combine_quilt_series () {
+    local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/series"
+    if [ -f "${sf}" ]; then
+        echo "[W] Overwriting the unnamed series file"
+        mv -v "${sf}" "${sf}.old"
+    fi
+    # get an ordered series which respects `Depends:` lines in  patched
+    echo "[I] Combining patchset series files"
+    local -ar patchfiles=($(
+        for series_name in "${@}"; do
+            cat "${sf%/*}/${series_name}.series"
+        done | while read patchfile_name; do
+            echo "${sf%/*}/${patchfile_name}"
+        done
+    ))
+    local -ar uniq_ordered_change_ids=($(
+        for patchfile in "${patchfiles[@]}"; do
+            # make sure we list dependent changes first
+            grep -Pho '(?<=Depends: I)[0-9a-f]+' "${patchfile}"
+            # then the actual change in this patch
+            grep -Pho '(?<=Change-Id: I)[0-9a-f]+' "${patchfile}"
+        done | true_uniq |  \
+        grep -xf <(grep -Pho '(?<=Change-Id: I)[0-9a-f]+' "${patchfiles[@]}") -
+    ))
+    for change_id in "${uniq_ordered_change_ids[@]}"; do
+        echo "${change_id}.patch"
+    done > "${sf}"
+    _rad_quilt_list_one "${sf}"
+}
+alias rqc="_rad_combine_quilt_series"
