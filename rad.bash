@@ -269,7 +269,7 @@ function _rad_combine_patches () {
     # delete any existing combined patch so we don't get confused
     rm -f -- "${cpf_path}"
     local -a cid_patchfiles=($(
-        grep -lr "${cid}" "${sf%/*}"
+        grep -lr "Change-Id: I${cid}" "${sf%/*}"
     ))
     # Get the message from the first patch we found
     extract_msg "${cid_patchfiles[1]}" > "${cpf_path}"
@@ -278,6 +278,11 @@ function _rad_combine_patches () {
     echo "${cpf_name}" >> "${sf}"
 }
 function _rad_quilt_export () {
+    if [ $# -gt 1 ]; then
+        echo "[E] _rad_quilt_export [series name]"
+        return 127
+    fi
+    local -r series_name="${1:-series}${1:+.series}"
     # get all patches since branching from upstream in all projects
     local -ar split_patches=($(
         _repo_wrap_inner git format-patch '@{u}..'                            \
@@ -308,7 +313,7 @@ function _rad_quilt_export () {
     # for each change ID, combine the per-project patches into a single
     # combined patch with the email content from the first one (they should all
     # be the same since they were committed with `_rad_commit_all`)
-    local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/series"
+    local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/${series_name}"
     [ -f "${sf}" ] && truncate -s 0 "${sf}" || touch "${sf}"
     for cid in "${uniq_change_ids[@]}"; do
         _rad_combine_patches "${sf}" "${cid}"
@@ -375,14 +380,15 @@ function _rad_find_mbox_patch_path () {
     _rad_find_editable_file_path "MBOX_PATH"
 }
 function _rad_quilt_recombine_outer () {
-    if [ $# -ne 1 ]; then
+    if [ $# -eq 0 ] || [ $# -gt 2 ]; then
         echo "[E] Bad call to _rad_quilt_recombine_outer: ${*}"
         return 127
     fi
     local -r inner_func="${1}"
+    local -r series_name="${2:-series}${2:+.series}"
     # loop through each patch in the quilt series splitting them up and
     # recommitting using the message header from the original patch file
-    local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/series"
+    local -r sf="${PWD}/${_RAD_QUILT_PATCHDIR}/${series_name}"
     if [ ! -f "${sf}" ]; then
         echo "[E] No quilt series file found :("
         return 127
