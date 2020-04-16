@@ -325,7 +325,7 @@ alias rqe="_rad_quilt_export"
 # the current work tree
 function _rad_perproj_recombine_patch () {
     if [ $# -ne 2 ]; then
-        echo "[E] Bad call to _rad_perproj_recombine_patch: ${*}"
+        echo "[E] Bad call to _rad_perproj_recombine_patch: ${*}" >&2
         return 127
     fi
     local -r cpf_path="${1}"    # combined patch file to split and recombine
@@ -339,7 +339,7 @@ function _rad_perproj_recombine_patch () {
         splitdiff -a -p 1 -D "${spf_dir}" "${cpf_path}" | grep -Po '(?<=>).*$'
     ))
     if [ -z "${split_patches[*]}" ]; then
-        echo "[I] No patches to import :)"
+        echo "[I] No patches to import :)" >&2
         return 0
     fi
     # for each of the split patches, work out to which project it applies and
@@ -351,8 +351,8 @@ function _rad_perproj_recombine_patch () {
             grep -Po '(?<=[-+]{3} [ab]/).*$' "${spf_path}" | true_uniq
         )"
         if [[ "${tf_path}" =~ $'\n' ]]; then
-            echo "[E] Somehow we didn't manage to split up ${cpf_path##*/}"
-            echo "[E] ${spf_path##*/} has multiple file targets"
+            echo "[E] Somehow we didn't manage to split up ${cpf_path##*/}" >&2
+            echo "[E] ${spf_path##*/} has multiple file targets" >&2
             return 127
         fi
         # find the relative path to the project this patch targets
