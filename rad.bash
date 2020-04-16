@@ -346,9 +346,16 @@ function _rad_perproj_recombine_patch () {
     # add the diff to the project specific recombined patch file
     local -a all_rpf_paths=()
     for spf_path in "${split_patches[@]}"; do
+        # We remove any rename destinations so that we don't think that the two
+        # paths refer to two different files being diffed
+        local rename_tos="$(
+            grep -Po '(?<=rename to ).*$' "${spf_path}" | true_uniq |
+            sed 's#\n#-e #'
+        )"
         local tf_path="$(
             # this pattern conveniently filters out `/dev/null` targets
-            grep -Po '(?<=[-+]{3} [ab]/).*$' "${spf_path}" | true_uniq
+            grep -Po '(?<=^[-+]{3} [ab]/).*$' "${spf_path}" | true_uniq |
+            grep ${rename_tos:+-v} "${rename_tos[@]:-.}"
         )"
         if [[ "${tf_path}" =~ $'\n' ]]; then
             echo "[E] Somehow we didn't manage to split up ${cpf_path##*/}" >&2
