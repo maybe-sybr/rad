@@ -450,7 +450,7 @@ function _rad_quilt_list_one () {
     fi
     while read line; do
         cpf_path="${sf%/*}/${line}"
-        echo -e "\t${line%.patch} -> $(grep 'Subject:' "${cpf_path}")"
+        echo -e "\t${line%.patch} -> $(grep '^Subject:' "${cpf_path}")"
     done <"${1}"
 }
 function _rad_quilt_list () {
