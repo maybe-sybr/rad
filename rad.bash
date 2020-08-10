@@ -228,6 +228,15 @@ function _rad_whatchanged_all () {
 }
 alias rwc="_rad_whatchanged_all"
 
+# render a oneline log for all projects between the upstream and HEAD
+function _rad_log_oneline_all () {
+    PAGER= _repo_wrap   \
+        git log --oneline --graph --decorate --color=always                 \
+            "@{upstream}~..HEAD" |                                          \
+        ${PAGER:-cat}
+}
+alias rlog="_rad_log_oneline_all"
+
 # export a unified quilt patch series for commits since branching from upstream
 _RAD_QUILT_PATCHDIR=".rad/patches"
 # helper functions for extracting and combining patchfiles
