@@ -194,7 +194,7 @@ EOF
         fi
     done >>"${COMMIT_MSG_PATH}"
     # jump to the 0th line to be helpful
-    ${EDITOR:-vim} -c "0" "${COMMIT_MSG_PATH}"
+    ${EDITOR:-vim} -c "0" -c "set filetype=gitcommit" "${COMMIT_MSG_PATH}"
     # strip out all the comment lines to finalise the message file to be used
     sed -i '/^#/d' "${COMMIT_MSG_PATH}"
 }
