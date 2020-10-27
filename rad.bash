@@ -158,6 +158,9 @@ alias rd="repo diff"
 alias rds="PAGER= _repo_wrap git diff --color=always --cached | ${PAGER:-cat}"
 alias rdc="rds"
 
+# push all project trees to their upstream branches
+alias rp="_repo_wrap git push"
+
 # commit changes in each repository using the same message - unfortunately the
 # most obvious way to do this means we need to write the commit message prior
 # making the actual commits which means using `-p` feels a bit bass-ackwards
