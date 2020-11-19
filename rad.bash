@@ -341,7 +341,7 @@ alias rwc="_rad_whatchanged_all"
 # render a oneline log for all projects between the upstream and HEAD
 function _rad_log_oneline_all () {
     PAGER= _repo_wrap   \
-        git log --oneline --graph --decorate --color=always                 \
+        git log --oneline --graph --decorate --color=always --first-parent  \
             "@{upstream}~..HEAD" 2>/dev/null |                              \
         ${PAGER:-cat}
 }
