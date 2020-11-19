@@ -165,6 +165,12 @@ alias rdc="rds"
 # push all project trees to their upstream branches
 alias rp="_repo_wrap git push"
 
+# list and manipulate branches
+alias rb="repo branch"
+alias rbs="repo branch start"
+alias rba="repo abandon"
+alias rco="repo checkout"
+
 # commit changes in each repository using the same message - unfortunately the
 # most obvious way to do this means we need to write the commit message prior
 # making the actual commits which means using `-p` feels a bit bass-ackwards
