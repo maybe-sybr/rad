@@ -163,7 +163,10 @@ alias rds="PAGER= _repo_wrap git diff --color=always --cached | ${PAGER:-cat}"
 alias rdc="rds"
 
 # push all project trees to their upstream branches
-alias rp="_repo_wrap git push"
+function _rad_push_each () {
+    git rev-parse HEAD@{upstream} >&/dev/null && git push
+}
+alias rp="_repo_wrap _rad_push_each"
 
 # list and manipulate branches
 alias rb="repo branch"
