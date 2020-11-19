@@ -105,7 +105,7 @@ function _rad_find_auntie_dir_path () {
 BOLD="\033[1m"
 RESET="\033[0m"
 function _repo_wrap_inner () {
-    repo forall -c "${*}"
+    repo forall -c "${SHELL:-bash}" -c "${*}"
 }
 function _repo_wrap () {
     local -a _RAD_FORALL_INIT=(
