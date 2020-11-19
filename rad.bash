@@ -170,7 +170,7 @@ alias rp="_repo_wrap _rad_push_each"
 
 # list and manipulate branches
 alias rb="repo branch"
-alias rbs="repo branch start"
+alias rbs="repo start"
 alias rba="repo abandon"
 alias rco="repo checkout"
 
