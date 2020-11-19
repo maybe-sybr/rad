@@ -233,6 +233,93 @@ EOF
 }
 alias rc="_rad_commit_all"
 
+# perform a merge for the name branch into its upstream in all projects in
+# which that branch exists
+function _rad_merge_offbranch_each () {
+    if [ $# -ne 3 ]; then
+        echo "[E] Bad call to _rad_merge_offbranch_each: ${*}"
+        return 127
+    fi
+    local -r MERGE_ID="${1}"
+    local -r MERGE_MSG_PATH="${2}"
+    local -r MERGE_FROM="${3}"
+    # first we need to check if the branch in question exists
+    git rev-parse "${MERGE_FROM}" &>/dev/null || return 0
+    # if so, checkout a merge branch from the upstream and perform the merge
+    local -r UPSTREAM="$(
+        git rev-parse --symbolic-full-name "${MERGE_FROM}@{upstream}"
+    )"
+    git checkout -b "refs/merge/${MERGE_ID}" --track "${UPSTREAM}"
+    git merge --no-ff -F "${MERGE_MSG_PATH}" "${MERGE_FROM}"
+}
+function _rad_merge_upstream_each () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to _rad_merge_upstream_each: ${*}"
+        return 127
+    fi
+    local -r MERGE_ID="${1}"
+    # first we need to check if the merge branch exists
+    local -r MERGE_BRANCH="refs/merge/${MERGE_ID}"
+    git rev-parse "${MERGE_BRANCH}" &>/dev/null || return 0
+    # ensure a local copy of the upstream exists
+    local -r UPSTREAM="$(
+        git rev-parse --symbolic-full-name "refs/merge/${MERGE_ID}@{upstream}"
+    )"
+    local -r UPSTREAM_BASE="$(sed 's#refs/remotes/[^/]\+/##' <<<"${UPSTREAM}")"
+    git branch --track "${UPSTREAM_BASE}" "${UPSTREAM}" 2>/dev/null
+    git push . "${MERGE_BRANCH}:${UPSTREAM_BASE}"
+}
+function _rad_merge_cleanup_each () {
+    if [ $# -ne 1 ]; then
+        echo "[E] Bad call to _rad_merge_cleanup_each: ${*}"
+        return 127
+    fi
+    local -r MERGE_ID="${1}"
+    # first we need to check if the merge branch exists
+    local -r MERGE_BRANCH="refs/merge/${MERGE_ID}"
+    git rev-parse "${MERGE_BRANCH}" &>/dev/null || return 0
+    # return to the last checkout if we're on the merge branch and delete it
+    local -r HEAD="$(git rev-parse HEAD)"
+    local -r MAYBE_MERGE="$(git rev-parse "${MERGE_BRANCH}")"
+    # we only do one checkout onto the merge branch so "@{-1}" is enough
+    [ "${MAYBE_MERGE}" = "${HEAD}" ] && git checkout "@{-1}" &>/dev/null
+    git branch --delete --force "refs/merge/${MERGE_ID}" >/dev/null
+}
+function _rad_merge_all () {
+    if [ $# -ne 1 ]; then
+        echo "[E] No merge source branch specified"
+        return 127
+    fi
+    local -r MERGE_FROM="${1}"
+    local -r MERGE_MSG_PATH="$(_rad_find_git_msg_path "MERGE_MESSAGE")"
+    local -r MERGE_ID="$(_rad_change_id)"
+    echo "Merging ${MERGE_FROM} as merge ID ${MERGE_ID}"
+    # we initially populate the message with a unique change ID which can be
+    # used to correlate the commits in each repo later
+    exec {merge_id_chunk}<> <(cat <<EOF
+Merge-Id: ${MERGE_ID}
+
+EOF
+)
+    exec {merge_log}<> <(
+        PAGER= _repo_wrap git log --oneline --graph --decorate              \
+            "${MERGE_FROM}@{upstream}~..${MERGE_FROM}"                      \
+        2>/dev/null | sed 's/^/# /'
+    )
+    # pass the chunks down to populate the file which will then be edited
+    local -ar chunks=( "${merge_id_chunk}" "${merge_log}" )
+    _rad_edit_commit_msg "${MERGE_MSG_PATH}" "${chunks[@]}" || return $?
+    if _repo_wrap "_rad_merge_offbranch_each \"${MERGE_ID}\" \"${MERGE_MSG_PATH}\" \"${MERGE_FROM}\"";
+    then
+        echo "Pushing successful merge to local branch of upstream"
+        _repo_wrap "_rad_merge_upstream_each \"${MERGE_ID}\""
+    else
+        _repo_wrap_quiet "git merge --abort 2>/dev/null"
+    fi
+    _repo_wrap_quiet "_rad_merge_cleanup_each \"${MERGE_ID}\""
+}
+alias rmerge="_rad_merge_all"
+
 # check whatchanged for all projects between the upstream and HEAD
 function _rad_whatchanged_all () {
     PAGER= _repo_wrap   \
