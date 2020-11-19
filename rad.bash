@@ -167,35 +167,25 @@ alias rp="_repo_wrap git push"
 IF_ANY_CHANGES="git status -z | grep -qEZ '^\s?[MADRCU]'"
 IF_STAGED_CHANGES="git status -z | grep -qEZ '^[MADRCU]'"
 
-function _rad_find_commit_msg_path () {
-    _rad_find_editable_file_path "COMMIT_MSG"
+function _rad_find_git_msg_path () {
+    _rad_find_editable_file_path "${1:-GIT_MESSAGE}"
 
 }
+function _rad_change_id () {
+    echo "I$(date +%s.%N | shasum | cut -d ' ' -f1)"
+}
 function _rad_edit_commit_msg () {
-    if [ $# -ne 1 ]; then
+    if [ $# -lt 1 ]; then
         echo "[E] Bad call to _rad_edit_commit_msg: ${*}"
         return 127
     fi
-    local -r COMMIT_MSG_PATH="${1}"
-    # we initially populate the message with a unique change ID which can be
-    # used to correlate the commits in each repo later
-    local -r CHANGE_ID="I$(date +%s.%N | shasum | cut -d ' ' -f1)"
-    cat >"${COMMIT_MSG_PATH}" <<EOF
-
-
-Change-Id: ${CHANGE_ID}
-# Depends: I...
-
-EOF
-    # and also the output of `git status` in each repo, commented of course
-    _repo_wrap "${IF_STAGED_CHANGES} && git status || echo -e 'No changes to commit\n'" |  \
-    while IFS= read -r line; do
-        if [ -n "${line}" ]; then
-            echo "# ${line}"
-        else
-            echo "#"
-        fi
-    done >>"${COMMIT_MSG_PATH}"
+    local -r COMMIT_MSG_PATH="${1}" ; shift
+    truncate -s 0 "${COMMIT_MSG_PATH}"
+    exec {top}<> <(echo -en '\n\n')
+    # `cat` each FD number passed down to this function into the commit message
+    eval cat '<&${top}' "${@/#/<&}" >>"${COMMIT_MSG_PATH}"
+    # and then close all of the FDs
+    exec {top}<&-; for i in "${@}"; do eval "exec {i}<&-"; done
     # jump to the 0th line to be helpful
     ${EDITOR:-vim} -c "0" -c "set filetype=gitcommit" "${COMMIT_MSG_PATH}"
     # strip out all the comment lines to finalise the message file to be used
@@ -209,9 +199,25 @@ function _rad_commit_all () {
         _repo_wrap _repo_add_interactive_each -p
         EXTRA_ARGS="${EXTRA_ARGS/-p/}"
     fi
-    # prep the commit message and then do it
-    local -r COMMIT_MSG_PATH="$(_rad_find_commit_msg_path)"
-    _rad_edit_commit_msg "${COMMIT_MSG_PATH}" || return $?
+    local -r COMMIT_MSG_PATH="$(_rad_find_git_msg_path "COMMIT_MSG")"
+    # we initially populate the message with a unique change ID which can be
+    # used to correlate the commits in each repo later
+    exec {change_id}<> <(cat <<EOF
+Change-Id: $(_rad_change_id)
+# Depends: I...
+
+EOF
+)
+    # and also the output of `git status` in each repo, commented of course
+    exec {staged_changes}<> <(
+        _repo_wrap "${IF_STAGED_CHANGES} && git status || echo -e 'No changes to commit\n'" | \
+        while IFS= read -r line; do
+            echo "# ${line}"
+        done | sed 's/\s\+$//'
+    )
+    # pass the chunks down to populate the file which will then be edited
+    local -ar chunks=( "${change_id}" "${staged_changes}" )
+    _rad_edit_commit_msg "${COMMIT_MSG_PATH}" "${chunks[@]}" || return $?
     # We only bother trying to commit a project if there are staged changes or
     # if `-a` is provided and there are any changes
     if [[ "${EXTRA_ARGS}" =~ "-a" ]]; then
