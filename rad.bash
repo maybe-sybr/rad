@@ -226,7 +226,8 @@ alias rc="_rad_commit_all"
 # check whatchanged for all projects between the upstream and HEAD
 function _rad_whatchanged_all () {
     PAGER= _repo_wrap   \
-        git whatchanged "@{upstream}.." --patch --color=always "${@}" | \
+        git whatchanged --patch --color=always                              \
+            "@{upstream}..HEAD" "${@}" 2>/dev/null |                        \
         ${PAGER:-cat}
 }
 alias rwc="_rad_whatchanged_all"
@@ -235,7 +236,7 @@ alias rwc="_rad_whatchanged_all"
 function _rad_log_oneline_all () {
     PAGER= _repo_wrap   \
         git log --oneline --graph --decorate --color=always                 \
-            "@{upstream}~..HEAD" |                                          \
+            "@{upstream}~..HEAD" 2>/dev/null |                              \
         ${PAGER:-cat}
 }
 alias rlog="_rad_log_oneline_all"
