@@ -107,11 +107,15 @@ RESET="\033[0m"
 function _repo_wrap_inner () {
     repo forall -c "${SHELL:-bash}" -c "${*}"
 }
-function _repo_wrap () {
-    local -a _RAD_FORALL_INIT=(
+function _repo_wrap_quiet () {
+    local -a _RAD_FORALL=(
         # sometimes this spits out a spurious syntax error...
-        "source \"${_RAD_SCRIPT_PATH}\" 2>/dev/null" " ; "
+        "source \"${_RAD_SCRIPT_PATH}\" 2>/dev/null" " ; " "${@}"
     )
+    _repo_wrap_inner "${_RAD_FORALL[*]}"
+}
+function _repo_wrap () {
+    local -a _RAD_FORALL_INIT=()
     # if we're on a TTY, bold the project header line
     if [ -t 1 ]; then
         _RAD_FORALL_INIT+=(
@@ -122,7 +126,7 @@ function _repo_wrap () {
             "echo -e \"--> project \${REPO_PATH}/\"" " ; "
         )
     fi
-    _repo_wrap_inner "${_RAD_FORALL_INIT[*]} ${*}"
+    _repo_wrap_quiet "${_RAD_FORALL_INIT[@]}" "${@}"
 }
 
 # find the closest .repo directory
