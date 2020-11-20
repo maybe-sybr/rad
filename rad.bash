@@ -164,7 +164,11 @@ alias rdc="rds"
 
 # push all project trees to their upstream branches
 function _rad_push_each () {
-    git rev-parse HEAD@{upstream} >&/dev/null && git push
+    if [ $# -eq 0 ] && ! git rev-parse HEAD@{upstream} &>/dev/null; then
+        echo "Nothing to do"
+        return 0
+    fi
+    git push "${@}"
 }
 alias rp="_repo_wrap _rad_push_each"
 
