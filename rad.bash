@@ -51,8 +51,8 @@ fi
 
 # util functions
 function query_yn () {
-    read -p "$* -- [y/n]: " -n 2 -r
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    printf "${*} -- [y/n]: "; read -r REPLY
+    if [[ $REPLY =~ ^[Yy]([Ee][Ss])?$ ]]; then
         return 0;
     else
         return 1
