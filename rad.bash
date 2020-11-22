@@ -309,11 +309,8 @@ function _rad_merge_all () {
     local -r MERGE_ID="$(_rad_change_id)"
     echo "Merging ${MERGE_FROM} as merge ID ${MERGE_ID}"
     # we populate an initial merge commit summary
-    local -r UPSTREAM="$(
-        git rev-parse --symbolic-full-name "${MERGE_FROM}@{upstream}"
-    )"
     exec {top}<> <(cat <<EOF
-merge: '${MERGE_FROM}' into '${UPSTREAM/refs\/remotes\//}'
+merge: '${MERGE_FROM}'
 
 EOF
 )
