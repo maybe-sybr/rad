@@ -198,9 +198,8 @@ function _rad_edit_commit_msg () {
     fi
     local -r COMMIT_MSG_PATH="${1}" ; shift
     truncate -s 0 "${COMMIT_MSG_PATH}"
-    exec {top}<> <(echo -en '\n\n')
     # `cat` each FD number passed down to this function into the commit message
-    eval cat '<&${top}' "${@/#/<&}" >>"${COMMIT_MSG_PATH}"
+    eval cat "${@/#/<&}" >>"${COMMIT_MSG_PATH}"
     # and then close all of the FDs
     exec {top}<&-; for i in "${@}"; do eval "exec {i}<&-"; done
     # jump to the 0th line to be helpful
@@ -217,6 +216,8 @@ function _rad_commit_all () {
         EXTRA_ARGS="${EXTRA_ARGS/-p/}"
     fi
     local -r COMMIT_MSG_PATH="$(_rad_find_git_msg_path "COMMIT_MSG")"
+    # we leave blank lines for the commit message to be written
+    exec {top}<> <(echo -en '\n\n')
     # we initially populate the message with a unique change ID which can be
     # used to correlate the commits in each repo later
     exec {change_id}<> <(cat <<EOF
@@ -233,7 +234,7 @@ EOF
         done | sed 's/\s\+$//'
     )
     # pass the chunks down to populate the file which will then be edited
-    local -ar chunks=( "${change_id}" "${staged_changes}" )
+    local -ar chunks=( "${top}" "${change_id}" "${staged_changes}" )
     _rad_edit_commit_msg "${COMMIT_MSG_PATH}" "${chunks[@]}" || return $?
     # We only bother trying to commit a project if there are staged changes or
     # if `-a` is provided and there are any changes
@@ -307,6 +308,15 @@ function _rad_merge_all () {
     local -r MERGE_MSG_PATH="$(_rad_find_git_msg_path "MERGE_MESSAGE")"
     local -r MERGE_ID="$(_rad_change_id)"
     echo "Merging ${MERGE_FROM} as merge ID ${MERGE_ID}"
+    # we populate an initial merge commit summary
+    local -r UPSTREAM="$(
+        git rev-parse --symbolic-full-name "${MERGE_FROM}@{upstream}"
+    )"
+    exec {top}<> <(cat <<EOF
+merge: '${MERGE_FROM}' into '${UPSTREAM/refs\/remotes\//}'
+
+EOF
+)
     # we initially populate the message with a unique change ID which can be
     # used to correlate the commits in each repo later
     exec {merge_id_chunk}<> <(cat <<EOF
@@ -316,11 +326,11 @@ EOF
 )
     exec {merge_log}<> <(
         PAGER= _repo_wrap git log --oneline --graph --decorate              \
-            "${MERGE_FROM}@{upstream}~..${MERGE_FROM}"                      \
+            "${UPSTREAM}~..${MERGE_FROM}"                                   \
         2>/dev/null | sed 's/^/# /'
     )
     # pass the chunks down to populate the file which will then be edited
-    local -ar chunks=( "${merge_id_chunk}" "${merge_log}" )
+    local -ar chunks=( "${top}" "${merge_id_chunk}" "${merge_log}" )
     _rad_edit_commit_msg "${MERGE_MSG_PATH}" "${chunks[@]}" || return $?
     if _repo_wrap "_rad_merge_offbranch_each \"${MERGE_ID}\" \"${MERGE_MSG_PATH}\" \"${MERGE_FROM}\"";
     then
