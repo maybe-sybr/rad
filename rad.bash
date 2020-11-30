@@ -249,6 +249,13 @@ alias rc="_rad_commit_all"
 
 # perform a merge for the name branch into its upstream in all projects in
 # which that branch exists
+function _rad_upstream_name () {
+    local -ar ARGS=( "${@}" )
+    git rev-parse --symbolic-full-name "${ARGS[@]/%/@{upstream\}}"
+}
+function _rad_local_name () {
+    sed -E 's#refs/remotes/[^/]+/#refs/heads/#' <<<"${@}"
+}
 function _rad_merge_offbranch_each () {
     if [ $# -ne 3 ]; then
         echo "[E] Bad call to _rad_merge_offbranch_each: ${*}"
@@ -259,10 +266,13 @@ function _rad_merge_offbranch_each () {
     local -r MERGE_FROM="${3}"
     # first we need to check if the branch in question exists
     git rev-parse "${MERGE_FROM}" &>/dev/null || return 0
-    # if so, checkout a merge branch from the upstream and perform the merge
-    local -r UPSTREAM="$(
-        git rev-parse --symbolic-full-name "${MERGE_FROM}@{upstream}"
-    )"
+    # if so, checkout a merge branch from either the upstream or a local copy
+    # of the upstream branch if one already exists
+    local UPSTREAM="$(_rad_upstream_name "${MERGE_FROM}")"
+    local -r LOCAL_NAME="$(_rad_local_name "${UPSTREAM}")"
+    if git rev-parse --verify --quiet "${LOCAL_NAME}" >/dev/null; then
+        UPSTREAM="${LOCAL_NAME}"
+    fi
     git checkout -b "refs/merge/${MERGE_ID}" --track "${UPSTREAM}"
     git merge --no-ff -F "${MERGE_MSG_PATH}" "${MERGE_FROM}"
 }
@@ -276,12 +286,10 @@ function _rad_merge_upstream_each () {
     local -r MERGE_BRANCH="refs/merge/${MERGE_ID}"
     git rev-parse "${MERGE_BRANCH}" &>/dev/null || return 0
     # ensure a local copy of the upstream exists
-    local -r UPSTREAM="$(
-        git rev-parse --symbolic-full-name "refs/merge/${MERGE_ID}@{upstream}"
-    )"
-    local -r UPSTREAM_BASE="$(sed 's#refs/remotes/[^/]\+/##' <<<"${UPSTREAM}")"
-    git branch --track "${UPSTREAM_BASE}" "${UPSTREAM}" 2>/dev/null
-    git push . "${MERGE_BRANCH}:${UPSTREAM_BASE}"
+    local -r UPSTREAM="$(_rad_upstream_name "${MERGE_BRANCH}")"
+    local -r LOCAL_NAME="$(_rad_local_name "${UPSTREAM}" | sed 's#refs/heads/##')"
+    git branch --track "${LOCAL_NAME}" "${UPSTREAM}" 2>/dev/null
+    git push . "${MERGE_BRANCH}:${LOCAL_NAME}"
 }
 function _rad_merge_cleanup_each () {
     if [ $# -ne 1 ]; then
