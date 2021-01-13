@@ -289,7 +289,7 @@ function _rad_merge_upstream_each () {
     local -r UPSTREAM="$(_rad_upstream_name "${MERGE_BRANCH}")"
     local -r LOCAL_NAME="$(_rad_local_name "${UPSTREAM}" | sed 's#refs/heads/##')"
     git branch --track "${LOCAL_NAME}" "${UPSTREAM}" 2>/dev/null
-    git push . "${MERGE_BRANCH}:${LOCAL_NAME}"
+    git push "file://${PWD}" "${MERGE_BRANCH}:${LOCAL_NAME}"
 }
 function _rad_merge_cleanup_each () {
     if [ $# -ne 1 ]; then
