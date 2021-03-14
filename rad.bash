@@ -108,7 +108,7 @@ function _repo_wrap_inner () {
     # We can't use `forall` to run interactive commands since v2.13 (fbab606
     # specifically) and it's easier to just loop over the paths anyway since it
     # avoids allowing `repo` to choose some level of parallelism > 1.
-    IFS=$'\n' declare -ar REPO_PATHS=( $(repo list --path-only) )
+    IFS=$'\n' declare -ar REPO_PATHS=( $(repo list --path-only --fullpath) )
     for repo_path in "${REPO_PATHS[@]}"; do
         (
             # `repo` provides lots of these so we may need to add more later
