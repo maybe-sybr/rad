@@ -189,7 +189,7 @@ function _rad_find_git_msg_path () {
 
 }
 function _rad_change_id () {
-    echo "I$(date +%s.%N | shasum | cut -d ' ' -f1)"
+    echo "I$(date +%s.%N | sha1sum | cut -d ' ' -f1)"
 }
 function _rad_edit_commit_msg () {
     if [ $# -lt 1 ]; then
