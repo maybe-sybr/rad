@@ -370,11 +370,13 @@ alias rwc="_rad_whatchanged_all"
 # render a oneline log for all projects between the upstream and HEAD
 function _rad_log_oneline_all () {
     PAGER= _repo_wrap   \
-        git log --oneline --graph --decorate --color=always                 \
-            "@{upstream}~..HEAD" 2>/dev/null |                              \
-        ${PAGER:-cat}
+        git log --oneline --graph --decorate --color=always "${@}"          \
+                    | ${PAGER:-cat}
 }
-alias rlog="_rad_log_oneline_all"
+alias rlog="_rad_log_oneline_all '@{upstream}^!' 'HEAD'"
+alias rloga="_rad_log_oneline_all --branches \
+    '^\$(git show-branch --merge-base \"refs/heads/*\" \"refs/heads/*/*\" \"@{upstream}\" 2>/dev/null)^@'
+"
 
 # export a unified quilt patch series for commits since branching from upstream
 _RAD_QUILT_PATCHDIR=".rad/patches"
