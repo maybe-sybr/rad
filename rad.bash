@@ -129,11 +129,11 @@ function _repo_wrap () {
     # if we're on a TTY, bold the project header line
     if [ -t 1 ]; then
         _RAD_FORALL_INIT+=(
-            "echo -e \"${BOLD}project \${REPO_PATH}/${RESET}\"" " ; "
+            "echo -e \"\n${BOLD}project \${REPO_PATH}/${RESET}\"" " ; "
         )
     else
         _RAD_FORALL_INIT+=(
-            "echo -e \"--> project \${REPO_PATH}/\"" " ; "
+            "echo -e \"\n--> project \${REPO_PATH}/\"" " ; "
         )
     fi
     _repo_wrap_quiet "${_RAD_FORALL_INIT[@]}" "${@}"
