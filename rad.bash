@@ -371,11 +371,11 @@ alias rwc="_rad_whatchanged_all"
 function _rad_log_oneline_all () {
     PAGER= _repo_wrap   \
         git log --oneline --graph --decorate --color=always "${@}"          \
-                    | ${PAGER:-cat}
+        2>&1 | ${PAGER:-cat}
 }
 alias rlog="_rad_log_oneline_all '@{upstream}^!' 'HEAD'"
-alias rloga="_rad_log_oneline_all --branches \
-    '^\$(git show-branch --merge-base \"refs/heads/*\" \"refs/heads/*/*\" \"@{upstream}\" 2>/dev/null)^@'
+alias rloga="_rad_log_oneline_all --branches                                \
+    '^\$(git show-branch --merge-base \"refs/heads/*\" \"refs/heads/*/*\" \"@{upstream}\" 2>/dev/null)^@'   \
 "
 
 # export a unified quilt patch series for commits since branching from upstream
