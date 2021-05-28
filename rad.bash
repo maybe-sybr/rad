@@ -377,6 +377,7 @@ alias rlog="_rad_log_oneline_all '@{upstream}^!' 'HEAD'"
 alias rloga="_rad_log_oneline_all --branches                                \
     '^\$(git show-branch --merge-base \"refs/heads/*\" \"refs/heads/*/*\" \"@{upstream}\" 2>/dev/null)^@'   \
 "
+alias rlogt="_rad_log_oneline_all '^\$(git describe --tags --always --abbrev=0)^@' 'HEAD'"
 
 # export a unified quilt patch series for commits since branching from upstream
 _RAD_QUILT_PATCHDIR=".rad/patches"
